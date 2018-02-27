@@ -58,7 +58,9 @@ class RestrictedServiceProvider extends ServiceProvider
         $usernames = $this->getRestrictedUsernames();
 
         Validator::extend('restricted', function ($attribute, $value, $parameters, $validator) use ($usernames) {
-            return ! $usernames->contains($value);
+            return ! $usernames->contains(function ($username) use ($value) {
+                return mb_stripos($value, $username) !== false;
+            });
         }, $this->getMessage());
     }
 
