@@ -10,6 +10,7 @@ namespace Codulab\Restricted;
 
 use Illuminate\Support\ServiceProvider;
 use Validator;
+use Cache;
 use Codulab\Restricted\Commands\CrawlRoutes;
 
 
@@ -70,15 +71,19 @@ class RestrictedServiceProvider extends ServiceProvider
     public function getRestrictedUsernames()
     {
         $path = $this->fileName;
-        if(file_exists($path)){
-            $content = file_get_contents($path);
-            return collect(explode(PHP_EOL, $content))
-                    ->map(function($value){
-                        return preg_replace("/\s/", "", $value);
-                    });
-        }else{
-            return collect([]);
-        }
+        return Cache::remember('laravel_restricted_words', 24 * 60, function () use ($path) {
+            if(file_exists($path)){
+                $content = file_get_contents($path);
+                return Cache::remember('laravel_restricted_words', 24 * 60, function () use ($content) {
+                    return collect(explode(PHP_EOL, $content))
+                        ->map(function($value){
+                            return preg_replace("/\s/", "", $value);
+                        });
+                });
+            }else{
+                return collect([]);
+            }
+        });
     }
 
     /**
