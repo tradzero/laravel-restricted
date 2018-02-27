@@ -56,30 +56,34 @@ class RestrictedServiceProvider extends ServiceProvider
      */
     public function initialize()
     {
-        $usernames = $this->getRestrictedUsernames();
+        $reservedFilePath = $this->fileName;
+        $siteLimitFilePath = public_path("siteLimit.txt");
+        $usernames = $this->getRestrictedUsernames($reservedFilePath, 'laravel_restricted_words');
+        $siteLimits = $this->getRestrictedUsernames($siteLimitFilePath, 'laravel_site_limit_words');
 
-        Validator::extend('restricted', function ($attribute, $value, $parameters, $validator) use ($usernames) {
-            return ! $usernames->contains(function ($username) use ($value) {
-                return mb_stripos($value, $username) !== false;
+        Validator::extend('restricted', function ($attribute, $value, $parameters, $validator) use ($usernames, $siteLimits) {
+            $restrictResult = $usernames->contains(function ($username) use ($value) {
+                return strcasecmp($username, $value) === 0;
             });
+            $siteLimitResult = $siteLimits->contains(function ($limit) use ($value) {
+                return mb_stripos($value, $limit) !== false;
+            });
+            return ! $siteLimitResult && ! $restrictResult;
         }, $this->getMessage());
     }
 
     /**
      * @return collection
      */
-    public function getRestrictedUsernames()
+    public function getRestrictedUsernames($path, $key)
     {
-        $path = $this->fileName;
-        return Cache::remember('laravel_restricted_words', 24 * 60, function () use ($path) {
+        return Cache::remember($key, 24 * 60, function () use ($path) {
             if(file_exists($path)){
                 $content = file_get_contents($path);
-                return Cache::remember('laravel_restricted_words', 24 * 60, function () use ($content) {
-                    return collect(explode(PHP_EOL, $content))
-                        ->map(function($value){
-                            return preg_replace("/\s/", "", $value);
-                        });
-                });
+                return collect(explode(PHP_EOL, $content))
+                    ->map(function($value){
+                        return preg_replace("/\s/", "", $value);
+                    });
             }else{
                 return collect([]);
             }
